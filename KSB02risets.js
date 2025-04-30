@@ -98,3 +98,40 @@ style.textContent = `
     #goog-gt-tt { display: none !important; }
 `;
 document.head.appendChild(style);
+(function () {
+    // Wait for page to fully load before triggering reset
+    window.addEventListener('load', () => {
+        try {
+            // SCORM 2004 Reset
+            if (typeof SCORM2004_CallSetValue === 'function') {
+                SCORM2004_CallSetValue("cmi.suspend_data", "");
+                SCORM2004_CallSetValue("cmi.exit", "");
+                SCORM2004_CallSetValue("cmi.session_time", "PT0H0M0S");
+                SCORM2004_CallSetValue("cmi.progress_measure", "0");
+                SCORM2004_CallCommit();
+                SCORM2004_CallTerminate();
+            }
+            // SCORM 1.2 Reset
+            else if (typeof doLMSSetValue === 'function') {
+                doLMSSetValue("cmi.suspend_data", "");
+                doLMSSetValue("cmi.exit", "");
+                doLMSSetValue("cmi.session_time", "0000:00:00.00");
+                doLMSSetValue("cmi.core.lesson_status", "not attempted");
+                doLMSCommit();
+                doLMSFinish();
+            }
+        } catch (e) {
+            console.warn("SCORM reset error:", e);
+        }
+
+        // Clear browser storage
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Reload the course after short delay
+        setTimeout(() => {
+            location.reload(true);
+        }, 1000);
+    });
+})();
+
