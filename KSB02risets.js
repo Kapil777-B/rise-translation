@@ -99,39 +99,49 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 (function () {
-    function resetSCORMProgressAndReload() {
+    function resetProgressAndReload() {
         try {
             // SCORM 2004 Reset
             if (typeof SCORM2004_CallSetValue === 'function') {
-                SCORM2004_CallSetValue("cmi.exit", "normal");
                 SCORM2004_CallSetValue("cmi.suspend_data", "");
-                SCORM2004_CallSetValue("cmi.progress_measure", "0");
+                SCORM2004_CallSetValue("cmi.exit", "normal");
                 SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
+                SCORM2004_CallSetValue("cmi.progress_measure", "0");
                 SCORM2004_CallCommit();
                 SCORM2004_CallTerminate();
             }
             // SCORM 1.2 Reset
             else if (typeof doLMSSetValue === 'function') {
-                doLMSSetValue("cmi.exit", "");
                 doLMSSetValue("cmi.suspend_data", "");
+                doLMSSetValue("cmi.exit", "");
                 doLMSSetValue("cmi.core.lesson_status", "incomplete");
                 doLMSCommit();
                 doLMSFinish();
             }
         } catch (e) {
-            console.warn("SCORM reset error:", e);
+            console.warn("SCORM reset failed:", e);
         }
 
         // Clear browser cache
         localStorage.clear();
         sessionStorage.clear();
 
-        // Force reload to start from beginning
+        // Reload page from start
         setTimeout(() => {
-            window.location.href = window.location.origin + window.location.pathname;
+            location.href = window.location.origin + window.location.pathname;
         }, 500);
     }
 
-    // Trigger on window load
-    window.addEventListener('load', resetSCORMProgressAndReload);
+    // Watch for language change in the Google Translate dropdown
+    const watchLanguageChange = setInterval(() => {
+        const langSelector = document.querySelector('.goog-te-combo');
+        if (langSelector) {
+            langSelector.addEventListener('change', function () {
+                localStorage.setItem('selectedLang', this.value);
+                resetProgressAndReload();
+            });
+            clearInterval(watchLanguageChange);
+        }
+    }, 500);
 })();
+
