@@ -99,24 +99,22 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 (function () {
-    // Wait for page to fully load before triggering reset
-    window.addEventListener('load', () => {
+    function resetSCORMProgressAndReload() {
         try {
             // SCORM 2004 Reset
             if (typeof SCORM2004_CallSetValue === 'function') {
+                SCORM2004_CallSetValue("cmi.exit", "normal");
                 SCORM2004_CallSetValue("cmi.suspend_data", "");
-                SCORM2004_CallSetValue("cmi.exit", "");
-                SCORM2004_CallSetValue("cmi.session_time", "PT0H0M0S");
                 SCORM2004_CallSetValue("cmi.progress_measure", "0");
+                SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
                 SCORM2004_CallCommit();
                 SCORM2004_CallTerminate();
             }
             // SCORM 1.2 Reset
             else if (typeof doLMSSetValue === 'function') {
-                doLMSSetValue("cmi.suspend_data", "");
                 doLMSSetValue("cmi.exit", "");
-                doLMSSetValue("cmi.session_time", "0000:00:00.00");
-                doLMSSetValue("cmi.core.lesson_status", "not attempted");
+                doLMSSetValue("cmi.suspend_data", "");
+                doLMSSetValue("cmi.core.lesson_status", "incomplete");
                 doLMSCommit();
                 doLMSFinish();
             }
@@ -124,14 +122,16 @@ document.head.appendChild(style);
             console.warn("SCORM reset error:", e);
         }
 
-        // Clear browser storage
+        // Clear browser cache
         localStorage.clear();
         sessionStorage.clear();
 
-        // Reload the course after short delay
+        // Force reload to start from beginning
         setTimeout(() => {
-            location.reload(true);
-        }, 1000);
-    });
-})();
+            window.location.href = window.location.origin + window.location.pathname;
+        }, 500);
+    }
 
+    // Trigger on window load
+    window.addEventListener('load', resetSCORMProgressAndReload);
+})();
