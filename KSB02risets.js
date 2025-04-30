@@ -101,16 +101,15 @@ document.head.appendChild(style);
 (function () {
     function resetProgressAndReload() {
         try {
-            // SCORM 2004 Reset
+            // SCORM 2004
             if (typeof SCORM2004_CallSetValue === 'function') {
                 SCORM2004_CallSetValue("cmi.suspend_data", "");
                 SCORM2004_CallSetValue("cmi.exit", "normal");
                 SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
-                SCORM2004_CallSetValue("cmi.progress_measure", "0");
                 SCORM2004_CallCommit();
                 SCORM2004_CallTerminate();
             }
-            // SCORM 1.2 Reset
+            // SCORM 1.2
             else if (typeof doLMSSetValue === 'function') {
                 doLMSSetValue("cmi.suspend_data", "");
                 doLMSSetValue("cmi.exit", "");
@@ -122,26 +121,25 @@ document.head.appendChild(style);
             console.warn("SCORM reset failed:", e);
         }
 
-        // Clear browser cache
+        // Clear browser storage
         localStorage.clear();
         sessionStorage.clear();
 
-        // Reload page from start
+        // Reload course from the beginning
         setTimeout(() => {
-            location.href = window.location.origin + window.location.pathname;
-        }, 500);
+            window.location.href = window.location.origin + window.location.pathname;
+        }, 800);
     }
 
-    // Watch for language change in the Google Translate dropdown
-    const watchLanguageChange = setInterval(() => {
+    // Attach language switch listener
+    const monitorLanguageDropdown = setInterval(() => {
         const langSelector = document.querySelector('.goog-te-combo');
         if (langSelector) {
             langSelector.addEventListener('change', function () {
                 localStorage.setItem('selectedLang', this.value);
-                resetProgressAndReload();
+                resetProgressAndReload();  // Full reload & reset
             });
-            clearInterval(watchLanguageChange);
+            clearInterval(monitorLanguageDropdown);
         }
     }, 500);
 })();
-
