@@ -45,27 +45,40 @@ function resetProgressAndReload() {
             SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
             SCORM2004_CallCommit();
             SCORM2004_CallTerminate();
+
+            setTimeout(() => {
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.href = window.location.origin + window.location.pathname;
+            }, 1000); // Give LMS time to save and exit
+
+            return;
         }
+
         // SCORM 1.2
-        else if (typeof doLMSSetValue === 'function') {
+        if (typeof doLMSSetValue === 'function') {
             doLMSSetValue("cmi.suspend_data", "");
             doLMSSetValue("cmi.exit", "");
             doLMSSetValue("cmi.core.lesson_status", "incomplete");
             doLMSCommit();
             doLMSFinish();
+
+            setTimeout(() => {
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.href = window.location.origin + window.location.pathname;
+            }, 1000); // Give LMS time to save and exit
+
+            return;
         }
     } catch (e) {
         console.warn("SCORM reset failed:", e);
     }
 
-    // Clear local/session storage
+    // Fallback for non-SCORM
     localStorage.clear();
     sessionStorage.clear();
-
-    // Reload course
-    setTimeout(() => {
-        window.location.href = window.location.origin + window.location.pathname;
-    }, 800);
+    window.location.href = window.location.origin + window.location.pathname;
 }
 
 // Monitor language change
