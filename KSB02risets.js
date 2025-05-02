@@ -28,7 +28,6 @@ function checkForTargetElement() {
     }
 }
 
-// Run once and observe DOM changes
 checkForTargetElement();
 
 const observer = new MutationObserver(() => {
@@ -36,39 +35,55 @@ const observer = new MutationObserver(() => {
 });
 observer.observe(document.body, { childList: true, subtree: true });
 
-// Store selected language and reload
-function resetCourseOnLanguageChange() {
+// Reset progress and reload
+function resetProgressAndReload() {
+    try {
+        // SCORM 2004
+        if (typeof SCORM2004_CallSetValue === 'function') {
+            SCORM2004_CallSetValue("cmi.suspend_data", "");
+            SCORM2004_CallSetValue("cmi.exit", "normal");
+            SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
+            SCORM2004_CallCommit();
+            SCORM2004_CallTerminate();
+        }
+        // SCORM 1.2
+        else if (typeof doLMSSetValue === 'function') {
+            doLMSSetValue("cmi.suspend_data", "");
+            doLMSSetValue("cmi.exit", "");
+            doLMSSetValue("cmi.core.lesson_status", "incomplete");
+            doLMSCommit();
+            doLMSFinish();
+        }
+    } catch (e) {
+        console.warn("SCORM reset failed:", e);
+    }
+
+    // Clear local/session storage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Reload course
+    setTimeout(() => {
+        window.location.href = window.location.origin + window.location.pathname;
+    }, 800);
+}
+
+// Monitor language change
+function monitorLanguageChange() {
     const interval = setInterval(() => {
         const selector = document.querySelector('.goog-te-combo');
         if (selector) {
             selector.addEventListener('change', function () {
-                const selectedLang = this.value;
-                localStorage.setItem('selectedLang', selectedLang);
-
-                // Reset Rise progress (local/session storage)
-                localStorage.clear();
-                sessionStorage.clear();
-
-                // Reload the page after a brief delay
-                setTimeout(() => {
-                    location.reload(true);
-                }, 1000);
+                localStorage.setItem('selectedLang', this.value);
+                resetProgressAndReload();
             });
-
             clearInterval(interval);
         }
-    }, 1000);
+    }, 500);
 }
 
-resetCourseOnLanguageChange();
-
-// On page load, apply previously selected language
-function applyStoredLanguage(){
-    document.getElementById("languageDropdown").addEventListener("change", function(e) {
-    var selectedLanguage = e.target.value;
-    setLanguage(selectedLanguage); // your translation logic
-});
-
+// Apply stored language on load
+function applyStoredLanguage() {
     const storedLang = localStorage.getItem('selectedLang');
     if (storedLang) {
         const tryApply = setInterval(() => {
@@ -78,13 +93,15 @@ function applyStoredLanguage(){
                 selector.dispatchEvent(new Event('change'));
                 clearInterval(tryApply);
             }
-        }, 1000);
+        }, 500);
     }
 }
 
+// Start monitoring and restoring language
+monitorLanguageChange();
 applyStoredLanguage();
 
-// Custom styles to clean up Google Translate UI
+// Clean up Google Translate UI
 const style = document.createElement('style');
 style.textContent = `
     iframe[id=":1.container"] { display: none !important; }
@@ -103,48 +120,3 @@ style.textContent = `
     #goog-gt-tt { display: none !important; }
 `;
 document.head.appendChild(style);
-(function () {
-    function resetProgressAndReload() {
-        try {
-            // SCORM 2004
-            if (typeof SCORM2004_CallSetValue === 'function') {
-                SCORM2004_CallSetValue("cmi.suspend_data", "");
-                SCORM2004_CallSetValue("cmi.exit", "normal");
-                SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
-                SCORM2004_CallCommit();
-                SCORM2004_CallTerminate();
-            }
-            // SCORM 1.2
-            else if (typeof doLMSSetValue === 'function') {
-                doLMSSetValue("cmi.suspend_data", "");
-                doLMSSetValue("cmi.exit", "");
-                doLMSSetValue("cmi.core.lesson_status", "incomplete");
-                doLMSCommit();
-                doLMSFinish();
-            }
-        } catch (e) {
-            console.warn("SCORM reset failed:", e);
-        }
-
-        // Clear browser storage
-        localStorage.clear();
-        sessionStorage.clear();
-
-        // Reload course from the beginning
-        setTimeout(() => {
-            window.location.href = window.location.origin + window.location.pathname;
-        }, 800);
-    }
-
-    // Attach language switch listener
-    const monitorLanguageDropdown = setInterval(() => {
-        const langSelector = document.querySelector('.goog-te-combo');
-        if (langSelector) {
-            langSelector.addEventListener('change', function () {
-                localStorage.setItem('selectedLang', this.value);
-                resetProgressAndReload();  // Full reload & reset
-            });
-            clearInterval(monitorLanguageDropdown);
-        }
-    }, 500);
-})();
