@@ -1,131 +1,108 @@
-// Inject Google Translate widget
-function createGoogleTranslateWidget() {
-    const translateDiv = document.createElement('div');
-    translateDiv.id = 'google_translate_element';
+(function () {
+    // STEP 1: Inject Google Translate Widget
+    function injectGoogleTranslate() {
+        if (document.querySelector('#google_translate_element')) return;
 
-    const targetDiv = document.querySelector('.cover__header-content-title');
-    if (!targetDiv || document.querySelector('#google_translate_element')) return;
+        const translateDiv = document.createElement('div');
+        translateDiv.id = 'google_translate_element';
+        const target = document.querySelector('.cover__header-content-title');
+        if (target) target.parentNode.insertBefore(translateDiv, target.nextSibling);
 
-    targetDiv.parentNode.insertBefore(translateDiv, targetDiv.nextSibling);
+        const script = document.createElement('script');
+        script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+        document.body.appendChild(script);
 
-    const script1 = document.createElement('script');
-    script1.type = 'text/javascript';
-    script1.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-    document.body.appendChild(script1);
-
-    window.googleTranslateElementInit = function () {
-        new google.translate.TranslateElement({
-            pageLanguage: 'en',
-            layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL
-        }, 'google_translate_element');
-    };
-}
-
-// DOM observer for inserting widget when ready
-function checkForTargetElement() {
-    const targetElement = document.querySelector('.cover__header-content-title');
-    const buttonExists = document.querySelector('#google_translate_element');
-    if (targetElement && !buttonExists) {
-        createGoogleTranslateWidget();
-    }
-}
-checkForTargetElement();
-const observer = new MutationObserver(() => {
-    checkForTargetElement();
-});
-observer.observe(document.body, { childList: true, subtree: true });
-
-// Full reset logic for SCORM + browser
-function fullyResetCourse() {
-    try {
-        // SCORM 2004
-        if (typeof SCORM2004_CallSetValue === 'function') {
-            SCORM2004_CallSetValue("cmi.suspend_data", "");
-            SCORM2004_CallSetValue("cmi.exit", "normal");
-            SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
-            SCORM2004_CallCommit();
-            SCORM2004_CallTerminate();
-        }
-        // SCORM 1.2
-        else if (typeof doLMSSetValue === 'function') {
-            doLMSSetValue("cmi.suspend_data", "");
-            doLMSSetValue("cmi.exit", "");
-            doLMSSetValue("cmi.core.lesson_status", "incomplete");
-            doLMSCommit();
-            doLMSFinish();
-        }
-    } catch (e) {
-        console.warn("SCORM reset failed:", e);
+        window.googleTranslateElementInit = function () {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL
+            }, 'google_translate_element');
+        };
     }
 
-    // Clear browser storage
-    localStorage.clear();
-    sessionStorage.clear();
+    // STEP 2: Watch for target element to appear
+    const observer = new MutationObserver(() => injectGoogleTranslate());
+    observer.observe(document.body, { childList: true, subtree: true });
+    injectGoogleTranslate(); // Run once immediately
 
-    // Reload clean
-    setTimeout(() => {
-        window.location.href = window.location.origin + window.location.pathname;
-    }, 800);
-}
-
-// Set flag on language change to trigger reset on next load
-function monitorLanguageChange() {
-    const interval = setInterval(() => {
-        const selector = document.querySelector('.goog-te-combo');
-        if (selector) {
-            selector.addEventListener('change', function () {
-                localStorage.setItem('selectedLang', this.value);
-                localStorage.setItem('forceResetNextLoad', 'true');
-                window.location.reload();
-            });
-            clearInterval(interval);
-        }
-    }, 500);
-}
-
-// Apply stored language on fresh load
-function applyStoredLanguage() {
-    const storedLang = localStorage.getItem('selectedLang');
-    if (storedLang) {
-        const tryApply = setInterval(() => {
-            const selector = document.querySelector('.goog-te-combo');
-            if (selector) {
-                selector.value = storedLang;
-                selector.dispatchEvent(new Event('change'));
-                clearInterval(tryApply);
+    // STEP 3: Detect language change and flag for reset
+    function monitorLangChange() {
+        const interval = setInterval(() => {
+            const combo = document.querySelector('.goog-te-combo');
+            if (combo) {
+                combo.addEventListener('change', () => {
+                    const lang = combo.value;
+                    localStorage.setItem('selectedLang', lang);
+                    localStorage.setItem('forceRestart', 'yes');
+                    location.reload(); // Soft reload → triggers SCORM reset on next load
+                });
+                clearInterval(interval);
             }
         }, 500);
     }
-}
+    monitorLangChange();
 
-// If flag is set, do full reset BEFORE Rise resumes
-(function checkForceResetFlag() {
-    const mustReset = localStorage.getItem('forceResetNextLoad');
-    if (mustReset === 'true') {
-        localStorage.removeItem('forceResetNextLoad');
-        fullyResetCourse(); // Reset SCORM + storage, then reload
+    // STEP 4: If flagged, reset SCORM & relaunch from start
+    if (localStorage.getItem('forceRestart') === 'yes') {
+        localStorage.removeItem('forceRestart');
+
+        // SCORM Reset
+        try {
+            if (typeof SCORM2004_CallSetValue === 'function') {
+                SCORM2004_CallSetValue("cmi.suspend_data", "");
+                SCORM2004_CallSetValue("cmi.exit", "normal");
+                SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
+                SCORM2004_CallCommit();
+                SCORM2004_CallTerminate();
+            } else if (typeof doLMSSetValue === 'function') {
+                doLMSSetValue("cmi.suspend_data", "");
+                doLMSSetValue("cmi.exit", "");
+                doLMSSetValue("cmi.core.lesson_status", "incomplete");
+                doLMSCommit();
+                doLMSFinish();
+            }
+        } catch (e) {
+            console.warn("No SCORM API found:", e);
+        }
+
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Hard reload from base URL
+        setTimeout(() => {
+            window.location.href = window.location.origin + window.location.pathname;
+        }, 800);
     }
+
+    // STEP 5: Auto-apply stored language on reload
+    function applyStoredLang() {
+        const lang = localStorage.getItem('selectedLang');
+        if (!lang) return;
+        const interval = setInterval(() => {
+            const combo = document.querySelector('.goog-te-combo');
+            if (combo) {
+                combo.value = lang;
+                combo.dispatchEvent(new Event('change'));
+                clearInterval(interval);
+            }
+        }, 500);
+    }
+    applyStoredLang();
+
+    // STEP 6: Optional cleanup styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .goog-logo-link, .VIpgJd-ZVi9od-l4eHX-hSRGPd, #goog-gt-tt, iframe[id=":1.container"] {
+            display: none !important;
+        }
+        .goog-te-gadget { color: transparent !important; }
+        .goog-te-combo {
+            background-color: #fff;
+            color: #000;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 6px 8px;
+        }
+    `;
+    document.head.appendChild(style);
 })();
-
-monitorLanguageChange();
-applyStoredLanguage();
-
-// Clean up Google Translate styles
-const style = document.createElement('style');
-style.textContent = `
-    iframe[id=":1.container"] { display: none !important; }
-    body {top: 0 !important;}
-    .goog-logo-link {display: none !important;}
-    .goog-te-gadget { color: transparent !important; }
-    .VIpgJd-ZVi9od-l4eHX-hSRGPd { display: none; }
-    .goog-te-combo {
-        background-color: #fff;
-        color: #000;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 6px 8px;
-    }
-    .skiptranslate.goog-te-gadget { padding-left: 60px; padding-bottom: 20px; }
-    #goog-gt-tt { display: none !important; }
-`;
-document.head.appendChild(style);
