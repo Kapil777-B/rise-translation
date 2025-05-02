@@ -63,7 +63,12 @@ function resetCourseOnLanguageChange() {
 resetCourseOnLanguageChange();
 
 // On page load, apply previously selected language
-function applyStoredLanguage() {
+function applyStoredLanguage(){
+    document.getElementById("languageDropdown").addEventListener("change", function(e) {
+    var selectedLanguage = e.target.value;
+    setLanguage(selectedLanguage); // your translation logic
+});
+
     const storedLang = localStorage.getItem('selectedLang');
     if (storedLang) {
         const tryApply = setInterval(() => {
