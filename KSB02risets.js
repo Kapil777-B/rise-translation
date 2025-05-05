@@ -5,8 +5,14 @@
 
         const translateDiv = document.createElement('div');
         translateDiv.id = 'google_translate_element';
+
+        // Insert after the header title or at top if not found
         const target = document.querySelector('.cover__header-content-title');
-        if (target) target.parentNode.insertBefore(translateDiv, target.nextSibling);
+        if (target && target.parentNode) {
+            target.parentNode.insertBefore(translateDiv, target.nextSibling);
+        } else {
+            document.body.insertBefore(translateDiv, document.body.firstChild);
+        }
 
         const script = document.createElement('script');
         script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
@@ -20,12 +26,12 @@
         };
     }
 
-    // STEP 2: Watch for target element to appear
+    // STEP 2: Observe DOM changes to trigger translation injection
     const observer = new MutationObserver(() => injectGoogleTranslate());
     observer.observe(document.body, { childList: true, subtree: true });
     injectGoogleTranslate(); // Run once immediately
 
-    // STEP 3: Detect language change and flag for reset
+    // STEP 3: Monitor language change
     function monitorLangChange() {
         const interval = setInterval(() => {
             const combo = document.querySelector('.goog-te-combo');
@@ -34,7 +40,7 @@
                     const lang = combo.value;
                     localStorage.setItem('selectedLang', lang);
                     localStorage.setItem('forceRestart', 'yes');
-                    location.reload(); // Soft reload → triggers SCORM reset on next load
+                    location.reload(); // Soft reload
                 });
                 clearInterval(interval);
             }
@@ -42,12 +48,11 @@
     }
     monitorLangChange();
 
-    // STEP 4: If flagged, reset SCORM & relaunch from start
+    // STEP 4: Reset SCORM data if needed and reload base page
     function resetSCORMAndReload() {
         if (localStorage.getItem('forceRestart') === 'yes') {
             localStorage.removeItem('forceRestart');
 
-            // SCORM Reset
             try {
                 if (typeof SCORM2004_CallSetValue === 'function') {
                     SCORM2004_CallSetValue("cmi.suspend_data", "");
@@ -63,22 +68,20 @@
                     doLMSFinish();
                 }
             } catch (e) {
-                console.warn("No SCORM API found:", e);
+                console.warn("SCORM API not available:", e);
             }
 
             localStorage.clear();
             sessionStorage.clear();
 
-            // Hard reload from base URL
             setTimeout(() => {
                 window.location.href = window.location.origin + window.location.pathname;
             }, 800);
         }
     }
-
     resetSCORMAndReload();
 
-    // STEP 5: Auto-apply stored language on reload
+    // STEP 5: Re-apply previously selected language on load
     function applyStoredLang() {
         const lang = localStorage.getItem('selectedLang');
         if (!lang) return;
@@ -87,17 +90,20 @@
             const combo = document.querySelector('.goog-te-combo');
             if (combo) {
                 combo.value = lang;
-                combo.dispatchEvent(new Event('change')); // Dispatch the change event to apply the language
+                combo.dispatchEvent(new Event('change'));
                 clearInterval(interval);
             }
         }, 500);
     }
     applyStoredLang();
 
-    // STEP 6: Optional cleanup styles
+    // STEP 6: Style cleanup to hide Google branding
     const style = document.createElement('style');
     style.textContent = `
-        .goog-logo-link, .VIpgJd-ZVi9od-l4eHX-hSRGPd, #goog-gt-tt, iframe[id=":1.container"] {
+        .goog-logo-link,
+        .VIpgJd-ZVi9od-l4eHX-hSRGPd,
+        #goog-gt-tt,
+        iframe[id^=":"] {
             display: none !important;
         }
         .goog-te-gadget { color: transparent !important; }
@@ -110,7 +116,6 @@
             font-size: 14px;
             margin: 5px;
         }
-        /* Optional: Style the translate div position */
         #google_translate_element {
             margin-top: 10px;
             text-align: right;
