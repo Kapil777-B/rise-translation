@@ -1,5 +1,4 @@
 (function () {
-    // Inject Google Translate Widget
     function injectGoogleTranslate() {
         if (document.querySelector('#google_translate_element')) return;
 
@@ -20,20 +19,20 @@
         };
     }
 
-    // Run when DOM changes
     const observer = new MutationObserver(() => injectGoogleTranslate());
     observer.observe(document.body, { childList: true, subtree: true });
     injectGoogleTranslate();
 
-    // Reload page on language change
+    // Monitor Google Translate dropdown and trigger reset
     function monitorLangChange() {
         const interval = setInterval(() => {
             const combo = document.querySelector('.goog-te-combo');
             if (combo) {
                 combo.addEventListener('change', () => {
-                    setTimeout(() => {
-                        location.reload(); // Just reload the browser
-                    }, 500); // slight delay to allow Google Translate to process
+                    const lang = combo.value;
+                    localStorage.setItem('selectedLang', lang);
+                    localStorage.setItem('forceRestart', 'yes');
+                    location.reload();
                 });
                 clearInterval(interval);
             }
@@ -41,7 +40,60 @@
     }
     monitorLangChange();
 
-    // Optional styling cleanup (optional)
+    // On reload, if flagged, clear suspend data and reset Rise
+    function resetIfNeeded() {
+        if (localStorage.getItem('forceRestart') === 'yes') {
+            localStorage.removeItem('forceRestart');
+
+            try {
+                // SCORM 2004
+                if (typeof SCORM2004_CallSetValue === 'function') {
+                    SCORM2004_CallSetValue("cmi.suspend_data", "");
+                    SCORM2004_CallSetValue("cmi.exit", "normal");
+                    SCORM2004_CallSetValue("cmi.completion_status", "incomplete");
+                    SCORM2004_CallCommit();
+                    SCORM2004_CallTerminate();
+                }
+                // SCORM 1.2
+                else if (typeof doLMSSetValue === 'function') {
+                    doLMSSetValue("cmi.suspend_data", "");
+                    doLMSSetValue("cmi.exit", "");
+                    doLMSSetValue("cmi.core.lesson_status", "incomplete");
+                    doLMSCommit();
+                    doLMSFinish();
+                }
+            } catch (e) {
+                console.warn("SCORM not found:", e);
+            }
+
+            localStorage.clear();
+            sessionStorage.clear();
+
+            // Final reload to clear cache
+            setTimeout(() => {
+                window.location.href = window.location.origin + window.location.pathname;
+            }, 500);
+        }
+    }
+    resetIfNeeded();
+
+    // Re-apply stored language after reload
+    function applyStoredLang() {
+        const lang = localStorage.getItem('selectedLang');
+        if (!lang) return;
+
+        const interval = setInterval(() => {
+            const combo = document.querySelector('.goog-te-combo');
+            if (combo) {
+                combo.value = lang;
+                combo.dispatchEvent(new Event('change'));
+                clearInterval(interval);
+            }
+        }, 500);
+    }
+    applyStoredLang();
+
+    // Clean up Google Translate UI
     const style = document.createElement('style');
     style.textContent = `
         .goog-logo-link, .VIpgJd-ZVi9od-l4eHX-hSRGPd, #goog-gt-tt, iframe[id=":1.container"] {
